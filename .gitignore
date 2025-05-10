@@ -1,0 +1,16 @@
+# Bytecode and virtual envs
+__pycache__/
+*.pyc
+.venv/
+
+# PyInstaller
+build/
+*.spec
+
+# Dist folder except final EXE
+dist/*
+!dist/CardScanner.exe
+
+# OS noise
+.DS_Store
+Thumbs.db
