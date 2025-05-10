@@ -11,6 +11,7 @@ from price_lookup import update_excel_with_prices
 import sys
 import io
 import threading
+import shutil
 
 class CardScannerApp:
     def __init__(self, root):
@@ -79,7 +80,9 @@ class CardScannerApp:
             messagebox.showerror("Error", "Please select valid directories.")
             return
 
-        out_dir.mkdir(parents=True, exist_ok=True)
+        images_dir = out_dir / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+
         images = list(in_dir.glob("*.jpg")) + list(in_dir.glob("*.png"))
 
         if not images:
@@ -92,8 +95,6 @@ class CardScannerApp:
             return
 
         coords = selector.coords
-        logs_dir = out_dir / "logs"
-        logs_dir.mkdir(exist_ok=True)
         log_file = start_log(out_dir)
         log_file.write(f"Scan started at {datetime.now()}\n")
         log_file.write(f"OCR region: {coords}\n\n")
@@ -108,20 +109,21 @@ class CardScannerApp:
                 card_name = card_name.strip()
                 safe_name = sanitize_card_name(card_name)
 
-                new_path = out_dir / f"{safe_name}{img_path.suffix.lower()}"
+                new_path = images_dir / f"{safe_name}{img_path.suffix.lower()}"
                 i = 1
                 base_name = safe_name
                 while new_path.exists():
                     safe_name = f"{base_name}_{i}"
-                    new_path = out_dir / f"{safe_name}{img_path.suffix.lower()}"
+                    new_path = images_dir / f"{safe_name}{img_path.suffix.lower()}"
                     i += 1
 
-                img_path.rename(new_path)
+                shutil.copy(img_path, new_path)
                 card_counts[base_name] = card_counts.get(base_name, 0) + 1
                 card_entries.append({
                     "ocr_name": card_name,
                     "file_name": safe_name,
-                    "quantity": 1
+                    "quantity": 1,
+                    "path": str(new_path)
                 })
                 log_file.write(f"→ OCR: '{card_name}' → Saved as: {new_path.name}\n")
             else:
