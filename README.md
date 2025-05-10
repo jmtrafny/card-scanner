@@ -63,7 +63,7 @@ The tool will:
 After scanning, your output folder will include:
 - Renamed image files
 - An Excel sheet like `scan_summary_2025-05-10_14-30-00.xlsx`
-- A `logs/` folder with a text file of what was scanned
+- A log file of what was scanned
 
 
 
