@@ -8,6 +8,9 @@ from region_selector import RegionSelector
 from session_logger import start_log
 from excel_logger import save_card_summary_to_excel
 from price_lookup import update_excel_with_prices
+import sys
+import io
+import threading
 
 class CardScannerApp:
     def __init__(self, root):
@@ -19,6 +22,7 @@ class CardScannerApp:
         self.root.title("Trading Card Scanner")
 
         self.setup_gui()
+        self.redirect_stdout()
 
     def setup_gui(self):
         tk.Label(self.root, text="Input Folder:").grid(row=0, column=0, sticky="e")
@@ -37,6 +41,20 @@ class CardScannerApp:
 
         tk.Button(self.root, text="Fetch Prices from eBay", command=self.fetch_prices).grid(row=4, column=1, pady=10)
 
+        self.output_text = tk.Text(self.root, height=10, width=70, state='disabled', bg='#f0f0f0')
+        self.output_text.grid(row=5, column=0, columnspan=3, padx=10, pady=(0, 10))
+
+    def redirect_stdout(self):
+        class StdoutRedirector(io.StringIO):
+            def write(inner_self, msg):
+                self.output_text.configure(state='normal')
+                self.output_text.insert(tk.END, msg)
+                self.output_text.see(tk.END)
+                self.output_text.configure(state='disabled')
+
+        sys.stdout = StdoutRedirector()
+        sys.stderr = sys.stdout
+
     def select_input_folder(self):
         folder = filedialog.askdirectory()
         if folder:
@@ -53,6 +71,7 @@ class CardScannerApp:
             self.excel_path.set(file)
 
     def start_scan(self):
+        self.clear_output()
         in_dir = Path(self.input_path.get())
         out_dir = Path(self.output_path.get())
 
@@ -120,13 +139,22 @@ class CardScannerApp:
                                              f"Summary saved to {excel_filename}")
 
     def fetch_prices(self):
+        self.clear_output()
         excel_file = self.excel_path.get()
         if not excel_file:
             messagebox.showerror("Error", "Please select an Excel file first.")
             return
 
-        updated_path = update_excel_with_prices(Path(excel_file))
-        messagebox.showinfo("Success", f"Prices updated in file:\n{updated_path}")
+        def run_fetch():
+            updated_path = update_excel_with_prices(Path(excel_file))
+            messagebox.showinfo("Success", f"Prices updated in file:\n{updated_path}")
+
+        threading.Thread(target=run_fetch, daemon=True).start()
+
+    def clear_output(self):
+        self.output_text.configure(state='normal')
+        self.output_text.delete("1.0", tk.END)
+        self.output_text.configure(state='disabled')
 
 
 if __name__ == "__main__":
