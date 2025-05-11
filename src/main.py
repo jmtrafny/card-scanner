@@ -1,25 +1,30 @@
-# main.py
-import tkinter as tk
-from tkinter import filedialog, messagebox
+# main.py (with ttkbootstrap)
+import sys
+import io
+import threading
+import shutil
 from pathlib import Path
 from datetime import datetime
+from PIL import Image
+import pytesseract
+
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+
+from tkinter import filedialog, messagebox
+
 from ocr_utils import sanitize_card_name
 from region_selector import RegionSelector
 from session_logger import start_log
 from csv_logger import save_card_summary_to_csv
 from price_lookup import update_csv_with_prices
-import sys
-import io
-import threading
-import shutil
-from PIL import Image
-import pytesseract
+
 
 class CardScannerApp:
     def __init__(self, root):
-        self.input_path = tk.StringVar()
-        self.output_path = tk.StringVar()
-        self.excel_path = tk.StringVar()
+        self.input_path = ttk.StringVar()
+        self.output_path = ttk.StringVar()
+        self.excel_path = ttk.StringVar()
 
         self.root = root
         self.root.title("Trading Card Scanner")
@@ -27,31 +32,33 @@ class CardScannerApp:
         self.redirect_stdout()
 
     def setup_gui(self):
-        tk.Label(self.root, text="Input Folder:").grid(row=0, column=0, sticky="e")
-        tk.Entry(self.root, textvariable=self.input_path, width=40).grid(row=0, column=1)
-        tk.Button(self.root, text="Browse", command=self.select_input_folder).grid(row=0, column=2)
+        padding = {"padx": 5, "pady": 5}
 
-        tk.Label(self.root, text="Output Folder:").grid(row=1, column=0, sticky="e")
-        tk.Entry(self.root, textvariable=self.output_path, width=40).grid(row=1, column=1)
-        tk.Button(self.root, text="Browse", command=self.select_output_folder).grid(row=1, column=2)
+        ttk.Label(self.root, text="Input Folder:").grid(row=0, column=0, sticky="e", **padding)
+        ttk.Entry(self.root, textvariable=self.input_path, width=40).grid(row=0, column=1, **padding)
+        ttk.Button(self.root, text="Browse", command=self.select_input_folder, bootstyle=PRIMARY).grid(row=0, column=2, **padding)
 
-        tk.Button(self.root, text="Start Scan", command=self.start_scan).grid(row=2, column=1, pady=10)
+        ttk.Label(self.root, text="Output Folder:").grid(row=1, column=0, sticky="e", **padding)
+        ttk.Entry(self.root, textvariable=self.output_path, width=40).grid(row=1, column=1, **padding)
+        ttk.Button(self.root, text="Browse", command=self.select_output_folder, bootstyle=PRIMARY).grid(row=1, column=2, **padding)
 
-        tk.Label(self.root, text="CSV File for Price Lookup:").grid(row=3, column=0, sticky="e")
-        tk.Entry(self.root, textvariable=self.excel_path, width=40).grid(row=3, column=1)
-        tk.Button(self.root, text="Choose File", command=self.select_excel_file).grid(row=3, column=2)
+        ttk.Button(self.root, text="Start Scan", command=self.start_scan, bootstyle=SUCCESS).grid(row=2, column=1, pady=10)
 
-        tk.Button(self.root, text="Fetch Prices from eBay", command=self.fetch_prices).grid(row=4, column=1, pady=10)
+        ttk.Label(self.root, text="CSV File for Price Lookup:").grid(row=3, column=0, sticky="e", **padding)
+        ttk.Entry(self.root, textvariable=self.excel_path, width=40).grid(row=3, column=1, **padding)
+        ttk.Button(self.root, text="Choose File", command=self.select_excel_file, bootstyle=PRIMARY).grid(row=3, column=2, **padding)
 
-        self.output_text = tk.Text(self.root, height=10, width=70, state='disabled', bg='#f0f0f0')
+        ttk.Button(self.root, text="Fetch Prices from eBay", command=self.fetch_prices, bootstyle=INFO).grid(row=4, column=1, pady=10)
+
+        self.output_text = ttk.Text(self.root, height=10, width=70, state='disabled')
         self.output_text.grid(row=5, column=0, columnspan=3, padx=10, pady=(0, 10))
 
     def redirect_stdout(self):
         class StdoutRedirector(io.StringIO):
             def write(inner_self, msg):
                 self.output_text.configure(state='normal')
-                self.output_text.insert(tk.END, msg)
-                self.output_text.see(tk.END)
+                self.output_text.insert("end", msg)
+                self.output_text.see("end")
                 self.output_text.configure(state='disabled')
 
         sys.stdout = StdoutRedirector()
@@ -159,10 +166,11 @@ class CardScannerApp:
 
     def clear_output(self):
         self.output_text.configure(state='normal')
-        self.output_text.delete("1.0", tk.END)
+        self.output_text.delete("1.0", "end")
         self.output_text.configure(state='disabled')
 
+
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = CardScannerApp(root)
-    root.mainloop()
+    app = ttk.Window(themename="superhero", title="Card Scanner")
+    CardScannerApp(app)
+    app.mainloop()
