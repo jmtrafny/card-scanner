@@ -18,12 +18,13 @@ from region_selector import RegionSelector
 from session_logger import start_log
 from csv_logger import save_card_summary_to_csv
 from price_lookup import update_csv_with_prices
-
+from config_utils import load_config, save_config
 
 class CardScannerApp:
     def __init__(self, root):
-        self.input_path = ttk.StringVar()
-        self.output_path = ttk.StringVar()
+        config = load_config()
+        self.input_path = ttk.StringVar(value=config.get("input_path", ""))
+        self.output_path = ttk.StringVar(value=config.get("output_path", ""))
         self.excel_path = ttk.StringVar()
 
         self.root = root
@@ -68,11 +69,19 @@ class CardScannerApp:
         folder = filedialog.askdirectory()
         if folder:
             self.input_path.set(folder)
-
+            self.save_current_config()
+    
     def select_output_folder(self):
         folder = filedialog.askdirectory()
         if folder:
             self.output_path.set(folder)
+            self.save_current_config()
+
+    def save_current_config(self):
+        save_config({
+            "input_path": self.input_path.get(),
+            "output_path": self.output_path.get()
+        })
 
     def select_excel_file(self):
         file = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
