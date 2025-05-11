@@ -52,7 +52,8 @@ class RegionSelector:
             "Mouse Controls:\n"
             "- Scroll: vertical scroll\n"
             "- Shift + Scroll: horizontal scroll\n"
-            "- Ctrl + Scroll: zoom in/out"
+            "- Ctrl + Scroll: zoom in/out\n\n"
+            "Note: First capture box is used as the file name"
         ))
         self.instructions.pack(pady=(10, 5), padx=5, anchor="w")
 
@@ -77,11 +78,13 @@ class RegionSelector:
 
         frame = tk.Frame(self.attr_frame)
         radio = tk.Radiobutton(frame, variable=self.selected_box_index, value=idx, command=lambda i=idx: self.set_current_box(i))
+        name_hint = " (used for filename)" if idx == 0 else ""
         entry = tk.Entry(frame, textvariable=box["name"], width=15)
         coord_label = tk.Label(frame, text="[x:0 y:0 w:0 h:0]", anchor="w")
 
         frame.pack(fill="x", pady=2, padx=5, anchor="w")
         radio.pack(side="left")
+        entry.insert(0, f"Attribute {idx+1}{name_hint}")
         entry.pack(side="left", padx=(5, 5))
         coord_label.pack(side="left")
 

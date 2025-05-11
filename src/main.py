@@ -3,7 +3,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from pathlib import Path
 from datetime import datetime
-from ocr_utils import extract_card_name, sanitize_card_name
+from ocr_utils import sanitize_card_name
 from region_selector import RegionSelector
 from session_logger import start_log
 from csv_logger import save_card_summary_to_csv
@@ -102,22 +102,24 @@ class CardScannerApp:
             log_file.write(f"Capture: {name} = {coords}\n")
         log_file.write("\n")
 
-        card_counts = {}
         card_entries = []
 
-        for img_path in images:
+        for idx, img_path in enumerate(images, start=1):
             log_file.write(f"[{img_path.name}] ")
             img = Image.open(img_path)
-            entry = {"path": str(images_dir / img_path.name), "quantity": 1}
+            entry = {"input_path": str(img_path)}
 
             for name, coords in capture_data:
                 cropped = img.crop(coords).convert("L")
                 text = pytesseract.image_to_string(cropped, config="--psm 7").strip()
                 entry[name] = text
 
-            card_name = entry.get("Name") or next(iter(entry.values()), "")
-            entry["ocr_name"] = card_name
+            primary_field = capture_data[0][0]  # First capture box name
+            card_name = entry.get(primary_field, "").strip()
             safe_name = sanitize_card_name(card_name)
+
+            if not safe_name or safe_name.lower() == "unknowncard":
+                safe_name = f"SCAN_{idx}"
 
             new_path = images_dir / f"{safe_name}{img_path.suffix.lower()}"
             i = 1
@@ -128,20 +130,18 @@ class CardScannerApp:
                 i += 1
 
             shutil.copy(img_path, new_path)
-            entry["file_name"] = safe_name
-            card_counts[base_name] = card_counts.get(base_name, 0) + 1
-            log_file.write(f"→ OCR: '{card_name}' → Saved as: {new_path.name}\n")
+            entry["output_path"] = str(new_path)
+            log_file.write(f"→ OCR → Saved as: {new_path.name}\n")
             card_entries.append(entry)
 
         log_file.write(f"\nScan complete. {len(images)} images processed.\n")
-        log_file.write(f"{len(card_counts)} unique cards identified.\n")
+        log_file.write(f"{len(card_entries)} entries recorded.\n")
         log_file.close()
 
         csv_filename = save_card_summary_to_csv(out_dir, card_entries)
         self.excel_path.set(str(out_dir / csv_filename))
 
         messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\n"
-                                             f"Found {len(card_counts)} unique cards.\n"
                                              f"Summary saved to {csv_filename}")
 
     def fetch_prices(self):
