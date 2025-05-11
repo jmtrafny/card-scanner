@@ -1,4 +1,4 @@
-# main.py (with ttkbootstrap)
+# main.py (with ttkbootstrap + spinner support)
 import sys
 import io
 import threading
@@ -19,6 +19,7 @@ from session_logger import start_log
 from csv_logger import save_card_summary_to_csv
 from price_lookup import update_csv_with_prices
 from config_utils import load_config, save_config
+
 
 class CardScannerApp:
     def __init__(self, root):
@@ -43,13 +44,21 @@ class CardScannerApp:
         ttk.Entry(self.root, textvariable=self.output_path, width=40).grid(row=1, column=1, **padding)
         ttk.Button(self.root, text="Browse", command=self.select_output_folder, bootstyle=PRIMARY).grid(row=1, column=2, **padding)
 
-        ttk.Button(self.root, text="Start Scan", command=self.start_scan, bootstyle=SUCCESS).grid(row=2, column=1, pady=10)
+        self.scan_button = ttk.Button(self.root, text="Start Scan", command=self.start_scan, bootstyle=SUCCESS)
+        self.scan_button.grid(row=2, column=1, pady=10)
+        self.spinner = ttk.Progressbar(self.root, mode='indeterminate', bootstyle="info-striped")
+        self.spinner.grid(row=2, column=2, pady=10)
+        self.spinner.grid_remove()
 
         ttk.Label(self.root, text="CSV File for Price Lookup:").grid(row=3, column=0, sticky="e", **padding)
         ttk.Entry(self.root, textvariable=self.excel_path, width=40).grid(row=3, column=1, **padding)
         ttk.Button(self.root, text="Choose File", command=self.select_excel_file, bootstyle=PRIMARY).grid(row=3, column=2, **padding)
 
-        ttk.Button(self.root, text="Fetch Prices from eBay", command=self.fetch_prices, bootstyle=INFO).grid(row=4, column=1, pady=10)
+        self.price_button = ttk.Button(self.root, text="Fetch Prices from eBay", command=self.fetch_prices, bootstyle=INFO)
+        self.price_button.grid(row=4, column=1, pady=10)
+        self.price_spinner = ttk.Progressbar(self.root, mode='indeterminate', bootstyle="info-striped")
+        self.price_spinner.grid(row=4, column=2, pady=10)
+        self.price_spinner.grid_remove()
 
         self.output_text = ttk.Text(self.root, height=10, width=70, state='disabled')
         self.output_text.grid(row=5, column=0, columnspan=3, padx=10, pady=(0, 10))
@@ -70,7 +79,7 @@ class CardScannerApp:
         if folder:
             self.input_path.set(folder)
             self.save_current_config()
-    
+
     def select_output_folder(self):
         folder = filedialog.askdirectory()
         if folder:
@@ -90,6 +99,24 @@ class CardScannerApp:
 
     def start_scan(self):
         self.clear_output()
+        self.scan_button.config(text="Scanning...", state="disabled")
+        self.spinner.grid()
+        self.spinner.start(10)
+
+        def run_scan():
+            try:
+                self.perform_scan()
+            finally:
+                self.root.after(0, self.reset_scan_button)
+
+        threading.Thread(target=run_scan, daemon=True).start()
+
+    def reset_scan_button(self):
+        self.spinner.stop()
+        self.spinner.grid_remove()
+        self.scan_button.config(text="Start Scan", state="normal")
+
+    def perform_scan(self):
         in_dir = Path(self.input_path.get())
         out_dir = Path(self.output_path.get())
 
@@ -158,7 +185,7 @@ class CardScannerApp:
         self.excel_path.set(str(out_dir / csv_filename))
 
         messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\n"
-                                             f"Summary saved to {csv_filename}")
+                                                 f"Summary saved to {csv_filename}")
 
     def fetch_prices(self):
         self.clear_output()
@@ -167,11 +194,23 @@ class CardScannerApp:
             messagebox.showerror("Error", "Please select a CSV file first.")
             return
 
+        self.price_button.config(text="Fetching...", state="disabled")
+        self.price_spinner.grid()
+        self.price_spinner.start(10)
+
         def run_fetch():
-            updated_path = update_csv_with_prices(Path(csv_file))
-            messagebox.showinfo("Success", f"Prices updated in file:\n{updated_path}")
+            try:
+                updated_path = update_csv_with_prices(Path(csv_file))
+                self.root.after(0, lambda: messagebox.showinfo("Success", f"Prices updated in file:\n{updated_path}"))
+            finally:
+                self.root.after(0, self.reset_price_button)
 
         threading.Thread(target=run_fetch, daemon=True).start()
+
+    def reset_price_button(self):
+        self.price_spinner.stop()
+        self.price_spinner.grid_remove()
+        self.price_button.config(text="Fetch Prices from eBay", state="normal")
 
     def clear_output(self):
         self.output_text.configure(state='normal')
