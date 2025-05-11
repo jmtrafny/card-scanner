@@ -6,18 +6,25 @@ from datetime import datetime
 from ocr_utils import extract_card_name, sanitize_card_name
 from region_selector import RegionSelector
 from session_logger import start_log
-from excel_logger import save_card_summary_to_excel
-from price_lookup import update_excel_with_prices
+from csv_logger import save_card_summary_to_csv  # Replaced Excel with CSV logger
+from price_lookup import update_csv_with_prices  # Rewritten to support CSV
 import sys
 import io
 import threading
 import shutil
 
+
 class CardScannerApp:
+    """
+    Main GUI class for the Card Scanner application.
+    Manages folder selection, OCR scan initiation, CSV generation, and price fetching.
+    """
+
     def __init__(self, root):
+        # File path variables for GUI fields
         self.input_path = tk.StringVar(value=r"C:\Users\jmtra\OneDrive\Desktop\input")
         self.output_path = tk.StringVar(value=r"C:\Users\jmtra\OneDrive\Desktop\output")
-        self.excel_path = tk.StringVar()
+        self.excel_path = tk.StringVar()  # Used for CSV file path now
 
         self.root = root
         self.root.title("Trading Card Scanner")
@@ -26,6 +33,7 @@ class CardScannerApp:
         self.redirect_stdout()
 
     def setup_gui(self):
+        """Builds the GUI layout."""
         tk.Label(self.root, text="Input Folder:").grid(row=0, column=0, sticky="e")
         tk.Entry(self.root, textvariable=self.input_path, width=40).grid(row=0, column=1)
         tk.Button(self.root, text="Browse", command=self.select_input_folder).grid(row=0, column=2)
@@ -36,7 +44,7 @@ class CardScannerApp:
 
         tk.Button(self.root, text="Start Scan", command=self.start_scan).grid(row=2, column=1, pady=10)
 
-        tk.Label(self.root, text="Excel File for Price Lookup:").grid(row=3, column=0, sticky="e")
+        tk.Label(self.root, text="CSV File for Price Lookup:").grid(row=3, column=0, sticky="e")
         tk.Entry(self.root, textvariable=self.excel_path, width=40).grid(row=3, column=1)
         tk.Button(self.root, text="Choose File", command=self.select_excel_file).grid(row=3, column=2)
 
@@ -46,6 +54,7 @@ class CardScannerApp:
         self.output_text.grid(row=5, column=0, columnspan=3, padx=10, pady=(0, 10))
 
     def redirect_stdout(self):
+        """Redirects print output to the GUI text area."""
         class StdoutRedirector(io.StringIO):
             def write(inner_self, msg):
                 self.output_text.configure(state='normal')
@@ -67,11 +76,13 @@ class CardScannerApp:
             self.output_path.set(folder)
 
     def select_excel_file(self):
-        file = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
+        """Now selects a CSV file instead of Excel."""
+        file = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file:
             self.excel_path.set(file)
 
     def start_scan(self):
+        """Performs OCR scanning and saves results to CSV."""
         self.clear_output()
         in_dir = Path(self.input_path.get())
         out_dir = Path(self.output_path.get())
@@ -102,6 +113,7 @@ class CardScannerApp:
         card_counts = {}
         card_entries = []
 
+        # Process each image
         for img_path in images:
             log_file.write(f"[{img_path.name}] ")
             card_name = extract_card_name(img_path, coords)
@@ -125,35 +137,38 @@ class CardScannerApp:
                     "quantity": 1,
                     "path": str(new_path)
                 })
-                log_file.write(f"→ OCR: '{card_name}' → Saved as: {new_path.name}\n")
+                log_file.write(f"\u2192 OCR: '{card_name}' \u2192 Saved as: {new_path.name}\n")
             else:
-                log_file.write("→ OCR FAILED\n")
+                log_file.write("\u2192 OCR FAILED\n")
 
         log_file.write(f"\nScan complete. {len(images)} images processed.\n")
         log_file.write(f"{len(card_counts)} unique cards identified.\n")
         log_file.close()
 
-        excel_filename = save_card_summary_to_excel(out_dir, card_entries)
-        self.excel_path.set(str(out_dir / excel_filename))
+        # Save to CSV instead of Excel
+        csv_filename = save_card_summary_to_csv(out_dir, card_entries)
+        self.excel_path.set(str(out_dir / csv_filename))
 
         messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\n"
-                                             f"Found {len(card_counts)} unique cards.\n"
-                                             f"Summary saved to {excel_filename}")
+                                                 f"Found {len(card_counts)} unique cards.\n"
+                                                 f"Summary saved to {csv_filename}")
 
     def fetch_prices(self):
+        """Starts a thread to fetch eBay prices and update CSV."""
         self.clear_output()
-        excel_file = self.excel_path.get()
-        if not excel_file:
-            messagebox.showerror("Error", "Please select an Excel file first.")
+        csv_file = self.excel_path.get()
+        if not csv_file:
+            messagebox.showerror("Error", "Please select a CSV file first.")
             return
 
         def run_fetch():
-            updated_path = update_excel_with_prices(Path(excel_file))
+            updated_path = update_csv_with_prices(Path(csv_file))
             messagebox.showinfo("Success", f"Prices updated in file:\n{updated_path}")
 
         threading.Thread(target=run_fetch, daemon=True).start()
 
     def clear_output(self):
+        """Clears the output text box."""
         self.output_text.configure(state='normal')
         self.output_text.delete("1.0", tk.END)
         self.output_text.configure(state='disabled')
