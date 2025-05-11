@@ -10,24 +10,44 @@ class RegionSelector:
         self.coords = None
         self.start_x = None
         self.start_y = None
-        self.rect_coords = None  # Store rectangle coordinates explicitly
+        self.rect_coords = None
         self.dragging_handle = None
         self.dragging_box = False
 
         self.root = tk.Toplevel()
         self.root.title("Select Card Name Region")
 
-        self.canvas = tk.Canvas(self.root)
-        self.canvas.grid(row=0, column=0, columnspan=3)
-
+        # Top control buttons
         self.btn_prev = tk.Button(self.root, text="<", command=self.show_prev_image)
-        self.btn_prev.grid(row=1, column=0, sticky="w")
+        self.btn_prev.grid(row=0, column=0, sticky="w")
 
         self.btn_ok = tk.Button(self.root, text="OK", command=self.confirm_selection)
-        self.btn_ok.grid(row=1, column=1)
+        self.btn_ok.grid(row=0, column=1)
 
         self.btn_next = tk.Button(self.root, text=">", command=self.show_next_image)
-        self.btn_next.grid(row=1, column=2, sticky="e")
+        self.btn_next.grid(row=0, column=2, sticky="e")
+
+        # Scrollable canvas container
+        self.canvas_frame = tk.Frame(self.root)
+        self.canvas_frame.grid(row=1, column=0, columnspan=3, sticky="nsew")
+
+        self.canvas = tk.Canvas(self.canvas_frame, bg="gray")
+        self.h_scroll = tk.Scrollbar(self.canvas_frame, orient="horizontal", command=self.canvas.xview)
+        self.v_scroll = tk.Scrollbar(self.canvas_frame, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(xscrollcommand=self.h_scroll.set, yscrollcommand=self.v_scroll.set)
+
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        self.v_scroll.grid(row=0, column=1, sticky="ns")
+        self.h_scroll.grid(row=1, column=0, sticky="ew")
+
+        self.canvas_frame.rowconfigure(0, weight=1)
+        self.canvas_frame.columnconfigure(0, weight=1)
+
+        # Allow window resizing
+        self.root.rowconfigure(1, weight=1)
+        self.root.columnconfigure(0, weight=1)
+        self.root.columnconfigure(1, weight=1)
+        self.root.columnconfigure(2, weight=1)
 
         self.rect = None
         self.handles = []
@@ -43,11 +63,10 @@ class RegionSelector:
         image_path = self.image_paths[self.index]
         self.img = Image.open(image_path)
         self.tk_img = ImageTk.PhotoImage(self.img)
-        self.canvas.delete("all")  # Clear everything on canvas
-        self.canvas.config(width=self.tk_img.width(), height=self.tk_img.height())
+        self.canvas.delete("all")
         self.canvas.create_image(0, 0, anchor="nw", image=self.tk_img)
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
-        # Recreate the bounding box if previously defined
         if self.rect_coords:
             x1, y1, x2, y2 = self.rect_coords
             self.rect = self.canvas.create_rectangle(x1, y1, x2, y2, outline='red')
@@ -72,23 +91,20 @@ class RegionSelector:
     def on_click(self, event):
         if event.widget != self.canvas:
             return
-        self.start_x, self.start_y = event.x, event.y
+        self.start_x, self.start_y = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
 
-        # Check if clicking on a handle
         for idx, handle in enumerate(self.handles):
             x1, y1, x2, y2 = self.canvas.coords(handle)
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            if x1 <= self.start_x <= x2 and y1 <= self.start_y <= y2:
                 self.dragging_handle = idx
                 return
 
-        # Check if clicking inside the box
         if self.rect_coords:
             x1, y1, x2, y2 = self.rect_coords
-            if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            if x1 <= self.start_x <= x2 and y1 <= self.start_y <= y2:
                 self.dragging_box = True
                 return
 
-        # Start drawing a new box
         if self.rect:
             self.canvas.delete(self.rect)
             for handle in self.handles:
@@ -100,17 +116,19 @@ class RegionSelector:
         if event.widget != self.canvas:
             return
 
+        cur_x = self.canvas.canvasx(event.x)
+        cur_y = self.canvas.canvasy(event.y)
+
         if self.dragging_handle is not None and self.rect_coords:
             coords = list(self.rect_coords)
             if self.dragging_handle == 0:
-                coords[0], coords[1] = event.x, event.y  # Top-left
+                coords[0], coords[1] = cur_x, cur_y
             elif self.dragging_handle == 1:
-                coords[2], coords[1] = event.x, event.y  # Top-right
+                coords[2], coords[1] = cur_x, cur_y
             elif self.dragging_handle == 2:
-                coords[2], coords[3] = event.x, event.y  # Bottom-right
+                coords[2], coords[3] = cur_x, cur_y
             elif self.dragging_handle == 3:
-                coords[0], coords[3] = event.x, event.y  # Bottom-left
-
+                coords[0], coords[3] = cur_x, cur_y
             self.rect_coords = tuple(coords)
             self.canvas.coords(self.rect, *coords)
             for handle in self.handles:
@@ -119,10 +137,9 @@ class RegionSelector:
             return
 
         if self.dragging_box and self.rect_coords:
-            dx = event.x - self.start_x
-            dy = event.y - self.start_y
-            self.start_x, self.start_y = event.x, event.y
-
+            dx = cur_x - self.start_x
+            dy = cur_y - self.start_y
+            self.start_x, self.start_y = cur_x, cur_y
             x1, y1, x2, y2 = self.rect_coords
             self.rect_coords = (x1 + dx, y1 + dy, x2 + dx, y2 + dy)
             self.canvas.coords(self.rect, *self.rect_coords)
@@ -132,18 +149,18 @@ class RegionSelector:
             return
 
         if self.rect:
-            self.canvas.coords(self.rect, self.start_x, self.start_y, event.x, event.y)
-            self.rect_coords = (int(self.start_x), int(self.start_y), int(event.x), int(event.y))
+            self.canvas.coords(self.rect, self.start_x, self.start_y, cur_x, cur_y)
+            self.rect_coords = (int(self.start_x), int(self.start_y), int(cur_x), int(cur_y))
             for handle in self.handles:
                 self.canvas.delete(handle)
-            self.draw_handles(self.start_x, self.start_y, event.x, event.y)
+            self.draw_handles(self.start_x, self.start_y, cur_x, cur_y)
 
     def on_release(self, event):
         self.dragging_handle = None
         self.dragging_box = False
 
     def draw_handles(self, x1, y1, x2, y2):
-        size = 3  # Smaller handles
+        size = 3
         corners = [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
         self.handles.clear()
         for x, y in corners:
