@@ -29,9 +29,13 @@ CardScanner is a free, open-source OCR tool for scanned Pokémon, Magic: The Gat
 
 ## 📸 Screenshots
 
-| OCR Setup | Final CSV Output |
-|-----------|------------------|
-| ![region selector](screenshots/selector.png) | ![csv](screenshots/output_csv.png) |
+| Main App Window | Region Selection |
+|-----------------|------------------|
+| ![main app](screenshots/main.png) | ![ocr setup](screenshots/ocr-selection.png) |
+
+| Final CSV Output |
+|------------------|
+| ![csv output](screenshots/output.png) |
 
 ---
 
