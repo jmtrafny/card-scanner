@@ -2,7 +2,7 @@
 import requests
 import re
 from bs4 import BeautifulSoup
-from statistics import median, StatisticsError
+from statistics import median, StatisticsError, mean
 from price_providers import PriceProvider
 
 COMMON_HEADERS = {
@@ -77,5 +77,10 @@ class EbayLastSoldProvider(PriceProvider):
         return "eBay (Last Sold Price)"
 
     def fetch_price(self, card_name: str) -> float:
-        prices = fetch_ebay_prices(card_name, max_items=1)
-        return round(prices[0], 2) if prices else None
+        prices = fetch_ebay_prices(card_name, max_items=10)
+        if not prices:
+            return None
+
+        avg = mean(prices)
+        filtered = [p for p in prices if p < avg * 1.5]
+        return round(filtered[0], 2) if filtered else round(prices[0], 2)
