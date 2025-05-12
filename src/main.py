@@ -1,4 +1,4 @@
-# main.py (with ttkbootstrap + spinner support)
+# main.py (safe tkinter threading for price scan)
 import sys
 import io
 import threading
@@ -11,14 +11,15 @@ import pytesseract
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 
 from ocr_utils import sanitize_card_name
 from region_selector import RegionSelector
 from session_logger import start_log
 from csv_logger import save_card_summary_to_csv
-from price_lookup import update_csv_with_prices
+from price_lookup import update_csv_with_prices, prompt_column_selection
 from config_utils import load_config, save_config
+from ebay_provider import EbayMedianProvider, EbayLastSoldProvider
 
 
 class CardScannerApp:
@@ -27,6 +28,14 @@ class CardScannerApp:
         self.input_path = ttk.StringVar(value=config.get("input_path", ""))
         self.output_path = ttk.StringVar(value=config.get("output_path", ""))
         self.excel_path = ttk.StringVar()
+        self.provider_name = ttk.StringVar()
+
+        self.providers = {
+            EbayMedianProvider().name(): EbayMedianProvider(),
+            EbayLastSoldProvider().name(): EbayLastSoldProvider()
+        }
+        default_provider = config.get("price_provider", list(self.providers.keys())[0])
+        self.provider_name.set(default_provider if default_provider in self.providers else list(self.providers.keys())[0])
 
         self.root = root
         self.root.title("Trading Card Scanner")
@@ -54,14 +63,19 @@ class CardScannerApp:
         ttk.Entry(self.root, textvariable=self.excel_path, width=40).grid(row=3, column=1, **padding)
         ttk.Button(self.root, text="Choose File", command=self.select_excel_file, bootstyle=PRIMARY).grid(row=3, column=2, **padding)
 
-        self.price_button = ttk.Button(self.root, text="Fetch Prices from eBay", command=self.fetch_prices, bootstyle=INFO)
-        self.price_button.grid(row=4, column=1, pady=10)
+        ttk.Label(self.root, text="Price Provider:").grid(row=4, column=0, sticky="e", **padding)
+        self.provider_dropdown = ttk.Combobox(self.root, textvariable=self.provider_name, values=list(self.providers.keys()), state="readonly")
+        self.provider_dropdown.grid(row=4, column=1, sticky="w", **padding)
+        self.provider_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_current_config())
+
+        self.price_button = ttk.Button(self.root, text="Get Price Data", command=self.prompt_and_fetch_prices, bootstyle=INFO)
+        self.price_button.grid(row=4, column=2, pady=10)
         self.price_spinner = ttk.Progressbar(self.root, mode='indeterminate', bootstyle="info-striped")
-        self.price_spinner.grid(row=4, column=2, pady=10)
+        self.price_spinner.grid(row=4, column=3, pady=10)
         self.price_spinner.grid_remove()
 
         self.output_text = ttk.Text(self.root, height=10, width=70, state='disabled')
-        self.output_text.grid(row=5, column=0, columnspan=3, padx=10, pady=(0, 10))
+        self.output_text.grid(row=5, column=0, columnspan=4, padx=10, pady=(0, 10))
 
     def redirect_stdout(self):
         class StdoutRedirector(io.StringIO):
@@ -89,7 +103,8 @@ class CardScannerApp:
     def save_current_config(self):
         save_config({
             "input_path": self.input_path.get(),
-            "output_path": self.output_path.get()
+            "output_path": self.output_path.get(),
+            "price_provider": self.provider_name.get()
         })
 
     def select_excel_file(self):
@@ -157,7 +172,7 @@ class CardScannerApp:
                 text = pytesseract.image_to_string(cropped, config="--psm 7").strip()
                 entry[name] = text
 
-            primary_field = capture_data[0][0]  # First capture box name
+            primary_field = capture_data[0][0]
             card_name = entry.get(primary_field, "").strip()
             safe_name = sanitize_card_name(card_name)
 
@@ -185,22 +200,43 @@ class CardScannerApp:
         self.excel_path.set(str(out_dir / csv_filename))
 
         messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\n"
-                                                 f"Summary saved to {csv_filename}")
+                                             f"Summary saved to {csv_filename}")
 
-    def fetch_prices(self):
+    def prompt_and_fetch_prices(self):
         self.clear_output()
         csv_file = self.excel_path.get()
         if not csv_file:
             messagebox.showerror("Error", "Please select a CSV file first.")
             return
 
+        provider = self.providers.get(self.provider_name.get())
+        if not provider:
+            messagebox.showerror("Error", "Invalid price provider selected.")
+            return
+
+        # Read columns first to prompt on main thread
+        try:
+            with open(csv_file, newline="", encoding="utf-8") as f:
+                import csv
+                reader = csv.reader(f)
+                header = next(reader)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read CSV file: {e}")
+            return
+
+        column = prompt_column_selection(header)
+        if not column or column not in header:
+            messagebox.showerror("Error", "Invalid or no column selected.")
+            return
+
+        # Now start background thread
         self.price_button.config(text="Fetching...", state="disabled")
         self.price_spinner.grid()
         self.price_spinner.start(10)
 
         def run_fetch():
             try:
-                updated_path = update_csv_with_prices(Path(csv_file))
+                updated_path = update_csv_with_prices(Path(csv_file), provider, column)
                 self.root.after(0, lambda: messagebox.showinfo("Success", f"Prices updated in file:\n{updated_path}"))
             finally:
                 self.root.after(0, self.reset_price_button)
@@ -210,7 +246,7 @@ class CardScannerApp:
     def reset_price_button(self):
         self.price_spinner.stop()
         self.price_spinner.grid_remove()
-        self.price_button.config(text="Fetch Prices from eBay", state="normal")
+        self.price_button.config(text="Get Price Data", state="normal")
 
     def clear_output(self):
         self.output_text.configure(state='normal')
