@@ -1,4 +1,4 @@
-# main.py (full un-truncated version)
+# main.py (updated with automatic dropdown population)
 import sys
 import io
 import csv
@@ -46,41 +46,42 @@ class CardScannerApp:
 
     def setup_gui(self):
         padding = {"padx": 5, "pady": 5}
+        button_opts = {"bootstyle": PRIMARY, "width": 12, "padding": (10, 5)}
 
-        ttk.Label(self.root, text="Input Folder:").grid(row=0, column=0, sticky="e", **padding)
-        ttk.Entry(self.root, textvariable=self.input_path, width=40).grid(row=0, column=1, **padding)
-        ttk.Button(self.root, text="Browse", command=self.select_input_folder, bootstyle=PRIMARY).grid(row=0, column=2, **padding)
+        ttk.Label(self.root, text="Input Folder:", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="e", **padding)
+        ttk.Entry(self.root, textvariable=self.input_path, width=50).grid(row=0, column=1, **padding)
+        ttk.Button(self.root, text="Browse", command=self.select_input_folder, **button_opts).grid(row=0, column=2, **padding)
 
-        ttk.Label(self.root, text="Output Folder:").grid(row=1, column=0, sticky="e", **padding)
-        ttk.Entry(self.root, textvariable=self.output_path, width=40).grid(row=1, column=1, **padding)
-        ttk.Button(self.root, text="Browse", command=self.select_output_folder, bootstyle=PRIMARY).grid(row=1, column=2, **padding)
+        ttk.Label(self.root, text="Output Folder:", font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky="e", **padding)
+        ttk.Entry(self.root, textvariable=self.output_path, width=50).grid(row=1, column=1, **padding)
+        ttk.Button(self.root, text="Browse", command=self.select_output_folder, **button_opts).grid(row=1, column=2, **padding)
 
-        self.scan_button = ttk.Button(self.root, text="Start Scan", command=self.start_scan, bootstyle=SUCCESS)
+        self.scan_button = ttk.Button(self.root, text="Start Scan", command=self.start_scan, bootstyle=SUCCESS, width=18, padding=(10, 5))
         self.scan_button.grid(row=2, column=1, pady=10)
         self.spinner = ttk.Progressbar(self.root, mode='indeterminate', bootstyle="info-striped")
         self.spinner.grid(row=2, column=2, pady=10)
         self.spinner.grid_remove()
 
-        ttk.Label(self.root, text="CSV File for Price Lookup:").grid(row=3, column=0, sticky="e", **padding)
-        ttk.Entry(self.root, textvariable=self.excel_path, width=40).grid(row=3, column=1, **padding)
-        ttk.Button(self.root, text="Choose File", command=self.select_excel_file, bootstyle=PRIMARY).grid(row=3, column=2, **padding)
+        ttk.Label(self.root, text="CSV File for Price Lookup:", font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky="e", **padding)
+        ttk.Entry(self.root, textvariable=self.excel_path, width=50).grid(row=3, column=1, **padding)
+        ttk.Button(self.root, text="Choose File", command=self.select_excel_file, **button_opts).grid(row=3, column=2, **padding)
 
-        ttk.Label(self.root, text="Price Provider:").grid(row=4, column=0, sticky="e", **padding)
-        self.provider_dropdown = ttk.Combobox(self.root, textvariable=self.provider_name, values=list(self.providers.keys()), state="readonly")
+        ttk.Label(self.root, text="Price Provider:", font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky="e", **padding)
+        self.provider_dropdown = ttk.Combobox(self.root, textvariable=self.provider_name, values=list(self.providers.keys()), state="readonly", width=40)
         self.provider_dropdown.grid(row=4, column=1, sticky="w", **padding)
         self.provider_dropdown.bind("<<ComboboxSelected>>", lambda e: self.save_current_config())
 
-        ttk.Label(self.root, text="Search Column:").grid(row=5, column=0, sticky="e", **padding)
-        self.column_dropdown = ttk.Combobox(self.root, textvariable=self.column_name, state="readonly")
+        ttk.Label(self.root, text="Search Column:", font=("Segoe UI", 10, "bold")).grid(row=5, column=0, sticky="e", **padding)
+        self.column_dropdown = ttk.Combobox(self.root, textvariable=self.column_name, state="readonly", width=40)
         self.column_dropdown.grid(row=5, column=1, sticky="w", **padding)
 
-        self.price_button = ttk.Button(self.root, text="Get Price Data", command=self.fetch_prices, bootstyle=INFO)
+        self.price_button = ttk.Button(self.root, text="Get Price Data", command=self.fetch_prices, bootstyle=INFO, width=18, padding=(10, 5))
         self.price_button.grid(row=5, column=2, pady=10)
         self.price_spinner = ttk.Progressbar(self.root, mode='indeterminate', bootstyle="info-striped")
         self.price_spinner.grid(row=5, column=3, pady=10)
         self.price_spinner.grid_remove()
 
-        self.output_text = ttk.Text(self.root, height=10, width=70, state='disabled')
+        self.output_text = ttk.Text(self.root, height=12, width=80, state='disabled', font=("Consolas", 9))
         self.output_text.grid(row=6, column=0, columnspan=4, padx=10, pady=(0, 10))
 
     def redirect_stdout(self):
@@ -186,7 +187,13 @@ class CardScannerApp:
             entry = {"input_path": str(img_path)}
 
             for name, coords in capture_data:
-                cropped = img.crop(coords).convert("L")
+                x1, y1, x2, y2 = coords
+                left = min(x1, x2)
+                top = min(y1, y2)
+                right = max(x1, x2)
+                bottom = max(y1, y2)
+                cropped = img.crop((left, top, right, bottom)).convert("L")
+
                 text = pytesseract.image_to_string(cropped, config="--psm 7").strip()
                 entry[name] = text
 
@@ -207,7 +214,7 @@ class CardScannerApp:
 
             shutil.copy(img_path, new_path)
             entry["output_path"] = str(new_path)
-            log_file.write(f"→ OCR → Saved as: {new_path.name}\n")
+            log_file.write(f"\u2192 OCR \u2192 Saved as: {new_path.name}\n")
             card_entries.append(entry)
 
         log_file.write(f"\nScan complete. {len(images)} images processed.\n")
@@ -216,9 +223,10 @@ class CardScannerApp:
 
         csv_filename = save_card_summary_to_csv(out_dir, card_entries)
         self.excel_path.set(str(out_dir / csv_filename))
+        self.update_column_dropdown(out_dir / csv_filename)
 
         messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\n"
-                                             f"Summary saved to {csv_filename}")
+                                                 f"Summary saved to {csv_filename}")
 
     def fetch_prices(self):
         self.clear_output()
