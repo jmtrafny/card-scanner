@@ -1,4 +1,4 @@
-# main.py (with inline column selector for price lookup)
+# main.py (full un-truncated version)
 import sys
 import io
 import csv
@@ -148,6 +148,77 @@ class CardScannerApp:
         self.spinner.stop()
         self.spinner.grid_remove()
         self.scan_button.config(text="Start Scan", state="normal")
+
+    def perform_scan(self):
+        in_dir = Path(self.input_path.get())
+        out_dir = Path(self.output_path.get())
+
+        if not in_dir.exists() or not out_dir:
+            messagebox.showerror("Error", "Please select valid directories.")
+            return
+
+        images_dir = out_dir / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        images = list(in_dir.glob("*.jpg")) + list(in_dir.glob("*.png"))
+
+        if not images:
+            messagebox.showinfo("No Images", "No images found in the input folder.")
+            return
+
+        selector = RegionSelector(images)
+        capture_data = selector.get_capture_data()
+        if not capture_data:
+            messagebox.showerror("Error", "No regions selected.")
+            return
+
+        log_file = start_log(out_dir)
+        log_file.write(f"Scan started at {datetime.now()}\n")
+        for name, coords in capture_data:
+            log_file.write(f"Capture: {name} = {coords}\n")
+        log_file.write("\n")
+
+        card_entries = []
+
+        for idx, img_path in enumerate(images, start=1):
+            log_file.write(f"[{img_path.name}] ")
+            img = Image.open(img_path)
+            entry = {"input_path": str(img_path)}
+
+            for name, coords in capture_data:
+                cropped = img.crop(coords).convert("L")
+                text = pytesseract.image_to_string(cropped, config="--psm 7").strip()
+                entry[name] = text
+
+            primary_field = capture_data[0][0]
+            card_name = entry.get(primary_field, "").strip()
+            safe_name = sanitize_card_name(card_name)
+
+            if not safe_name or safe_name.lower() == "unknowncard":
+                safe_name = f"SCAN_{idx}"
+
+            new_path = images_dir / f"{safe_name}{img_path.suffix.lower()}"
+            i = 1
+            base_name = safe_name
+            while new_path.exists():
+                safe_name = f"{base_name}_{i}"
+                new_path = images_dir / f"{safe_name}{img_path.suffix.lower()}"
+                i += 1
+
+            shutil.copy(img_path, new_path)
+            entry["output_path"] = str(new_path)
+            log_file.write(f"→ OCR → Saved as: {new_path.name}\n")
+            card_entries.append(entry)
+
+        log_file.write(f"\nScan complete. {len(images)} images processed.\n")
+        log_file.write(f"{len(card_entries)} entries recorded.\n")
+        log_file.close()
+
+        csv_filename = save_card_summary_to_csv(out_dir, card_entries)
+        self.excel_path.set(str(out_dir / csv_filename))
+
+        messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\n"
+                                             f"Summary saved to {csv_filename}")
 
     def fetch_prices(self):
         self.clear_output()
