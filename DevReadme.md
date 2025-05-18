@@ -41,6 +41,35 @@ pip install -r requirements.txt
   ```bash
   python src/main.py
   ```
+---
+To add new fuzzy matching sources:
+
+1. Place your `.txt` list of names in the following directory:
+   ```
+   src/card_db/
+   ```
+   Each file must have one card name per line. Example:
+   ```
+   Dark Magician
+   Blue-Eyes White Dragon
+   Red-Eyes B. Dragon
+   ```
+
+2. Open `fuzzy_utils.py` and locate the `file_map` in the `load_card_list()` function.
+
+3. Add a new entry using the fuzzy dropdown label as the key and your filename as the value:
+   ```python
+   file_map = {
+       "Pokemon Name": "pokemon.txt",
+       "YuGiOh": "yugioh.txt",  # ← Add new entries like this
+   }
+   ```
+
+This allows the dropdown in the region selector to dynamically associate your fuzzy match type with a specific card list.
+
+Once added, the fuzzy match logic in `main.py` will automatically pick it up and apply corrections during scanning.
+
+Make sure filenames match exactly, and remember that fuzzy match type values in the dropdown must match the keys you use in `file_map`.
 
 ---
 
