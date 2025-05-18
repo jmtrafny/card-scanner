@@ -1,4 +1,3 @@
-# main.py (updated with automatic dropdown population)
 import sys
 import io
 import csv
@@ -21,6 +20,7 @@ from csv_logger import save_card_summary_to_csv
 from price_lookup import update_csv_with_prices
 from config_utils import load_config, save_config
 from ebay_provider import EbayMedianProvider, EbayLastSoldProvider
+from fuzzy_utils import load_card_list, fuzzy_match_name
 
 
 class CardScannerApp:
@@ -162,21 +162,22 @@ class CardScannerApp:
         images_dir.mkdir(parents=True, exist_ok=True)
 
         images = list(in_dir.glob("*.jpg")) + list(in_dir.glob("*.png"))
-
         if not images:
             messagebox.showinfo("No Images", "No images found in the input folder.")
             return
 
         selector = RegionSelector(images)
-        capture_data = selector.get_capture_data()
+        capture_data = selector.get_capture_data()  # (name, coords, fuzzy_type)
         if not capture_data:
             messagebox.showerror("Error", "No regions selected.")
             return
 
+        fuzzy_cache = {}
+
         log_file = start_log(out_dir)
         log_file.write(f"Scan started at {datetime.now()}\n")
-        for name, coords in capture_data:
-            log_file.write(f"Capture: {name} = {coords}\n")
+        for name, coords, fuzzy in capture_data:
+            log_file.write(f"Capture: {name} = {coords} (fuzzy: {fuzzy})\n")
         log_file.write("\n")
 
         card_entries = []
@@ -186,35 +187,37 @@ class CardScannerApp:
             img = Image.open(img_path)
             entry = {"input_path": str(img_path)}
 
-            for name, coords in capture_data:
+            for name, coords, fuzzy in capture_data:
                 x1, y1, x2, y2 = coords
-                left = min(x1, x2)
-                top = min(y1, y2)
-                right = max(x1, x2)
-                bottom = max(y1, y2)
-                cropped = img.crop((left, top, right, bottom)).convert("L")
-
+                cropped = img.crop((min(x1,x2), min(y1,y2), max(x1,x2), max(y1,y2))).convert("L")
                 text = pytesseract.image_to_string(cropped, config="--psm 7").strip()
                 entry[name] = text
+
+                if fuzzy != "No Fuzzy Matching":
+                    if fuzzy not in fuzzy_cache:
+                        try:
+                            fuzzy_cache[fuzzy] = load_card_list(fuzzy)
+                        except Exception as e:
+                            print(f"Warning: failed to load fuzzy list for {fuzzy}: {e}")
+                            fuzzy_cache[fuzzy] = []
+                    match = fuzzy_match_name(text, fuzzy_cache[fuzzy])
+                    entry[f"Fuzzy {name}"] = match
 
             primary_field = capture_data[0][0]
             card_name = entry.get(primary_field, "").strip()
             safe_name = sanitize_card_name(card_name)
-
             if not safe_name or safe_name.lower() == "unknowncard":
                 safe_name = f"SCAN_{idx}"
 
             new_path = images_dir / f"{safe_name}{img_path.suffix.lower()}"
             i = 1
-            base_name = safe_name
             while new_path.exists():
-                safe_name = f"{base_name}_{i}"
-                new_path = images_dir / f"{safe_name}{img_path.suffix.lower()}"
+                new_path = images_dir / f"{safe_name}_{i}{img_path.suffix.lower()}"
                 i += 1
 
             shutil.copy(img_path, new_path)
             entry["output_path"] = str(new_path)
-            log_file.write(f"\u2192 OCR \u2192 Saved as: {new_path.name}\n")
+            log_file.write(f"→ OCR → Saved as: {new_path.name}\n")
             card_entries.append(entry)
 
         log_file.write(f"\nScan complete. {len(images)} images processed.\n")
@@ -225,8 +228,8 @@ class CardScannerApp:
         self.excel_path.set(str(out_dir / csv_filename))
         self.update_column_dropdown(out_dir / csv_filename)
 
-        messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\n"
-                                                 f"Summary saved to {csv_filename}")
+        messagebox.showinfo("Scan Complete", f"Processed {len(images)} cards.\nSummary saved to {csv_filename}")
+
 
     def fetch_prices(self):
         self.clear_output()

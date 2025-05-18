@@ -1,7 +1,10 @@
-# region_selector.py
+# region_selector.py (updated with fuzzy match dropdown)
 import tkinter as tk
+from tkinter import ttk
 from PIL import Image, ImageTk
 from pathlib import Path
+
+FUZZY_OPTIONS = ["No Fuzzy Matching", "Pokemon Name", "YuGiOh Card Name", "MTG Card Name"]
 
 class RegionSelector:
     def __init__(self, image_paths):
@@ -17,15 +20,15 @@ class RegionSelector:
 
         self.root = tk.Toplevel()
         self.root.title("Select OCR Regions")
-        self.root.geometry("1000x700")
+        self.root.geometry("800x600")
 
         # Layout: top bar
         nav_frame = tk.Frame(self.root)
         nav_frame.grid(row=0, column=0, columnspan=2, sticky="ew")
-        self.btn_prev = tk.Button(nav_frame, text="◀ Previous", font=("Segoe UI", 10, "bold"), padx=10, pady=5, command=self.show_prev_image)
-        self.btn_prev.pack(side="left", padx=5, pady=5)
-        self.btn_next = tk.Button(nav_frame, text="Next ▶", font=("Segoe UI", 10, "bold"), padx=10, pady=5, command=self.show_next_image)
-        self.btn_next.pack(side="left", padx=5, pady=5)
+        self.btn_prev = tk.Button(nav_frame, text="<", command=self.show_prev_image)
+        self.btn_prev.pack(side="left")
+        self.btn_next = tk.Button(nav_frame, text=">", command=self.show_next_image)
+        self.btn_next.pack(side="left")
 
         # Canvas area
         self.canvas_frame = tk.Frame(self.root)
@@ -41,29 +44,23 @@ class RegionSelector:
         self.canvas_frame.columnconfigure(0, weight=1)
 
         # Capture box panel
-        self.attr_frame = tk.Frame(self.root, bd=2, relief="ridge")
+        self.attr_frame = tk.Frame(self.root)
         self.attr_frame.grid(row=1, column=1, sticky="nsew")
         self.attr_frame.columnconfigure(0, weight=1)
 
-        self.add_box_button = tk.Button(self.attr_frame, text="＋ Add Capture Box", font=("Segoe UI", 10, "bold"), bg="#d1e7dd", activebackground="#c3e6cb", command=self.add_capture_box)
-        self.add_box_button.pack(pady=(10, 15), padx=10, fill="x")
+        self.add_box_button = tk.Button(self.attr_frame, text="+ Add Capture Box", command=self.add_capture_box)
+        self.add_box_button.pack(pady=(5, 10))
 
-        self.instructions = tk.Label(
-            self.attr_frame,
-            justify="left",
-            anchor="w",
-            font=("Segoe UI", 9),
-            text=(
-                "🖱 Mouse Controls:\n"
-                "- Scroll: vertical\n"
-                "- Shift + Scroll: horizontal\n"
-                "- Ctrl + Scroll: zoom in/out\n\n"
-                "💡 Tip: First capture box is used as the file name"
-            )
-        )
-        self.instructions.pack(pady=(0, 10), padx=10, anchor="w")
+        self.instructions = tk.Label(self.attr_frame, justify="left", anchor="w", text=(
+            "Mouse Controls:\n"
+            "- Scroll: vertical scroll\n"
+            "- Shift + Scroll: horizontal scroll\n"
+            "- Ctrl + Scroll: zoom in/out\n\n"
+            "Note: First capture box is used for file name"
+        ))
+        self.instructions.pack(pady=(10, 5), padx=5, anchor="w")
 
-        self.confirm_button = tk.Button(self.root, text="✅ OK", font=("Segoe UI", 10, "bold"), bg="#cfe2ff", activebackground="#b6d4fe", command=self.confirm_selection)
+        self.confirm_button = tk.Button(self.root, text="OK", command=self.confirm_selection)
         self.confirm_button.grid(row=2, column=1, sticky="e", pady=10, padx=10)
 
         self.root.rowconfigure(1, weight=1)
@@ -75,30 +72,30 @@ class RegionSelector:
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
         self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
 
-        self.add_capture_box()  # Add first capture box immediately
         self.load_image()
         self.root.wait_window()
 
     def add_capture_box(self):
         idx = len(self.capture_boxes)
-        box = {"name": tk.StringVar(), "coords": None}
+        box = {"name": tk.StringVar(), "coords": None, "fuzzy_type": tk.StringVar(value=FUZZY_OPTIONS[0])}
 
         frame = tk.Frame(self.attr_frame)
         radio = tk.Radiobutton(frame, variable=self.selected_box_index, value=idx, command=lambda i=idx: self.set_current_box(i))
         name_hint = " (used for filename)" if idx == 0 else ""
-        entry = tk.Entry(frame, textvariable=box["name"], width=18, font=("Segoe UI", 9))
-        coord_label = tk.Label(frame, text="[x:0 y:0 w:0 h:0]", anchor="w", font=("Consolas", 8))
+        entry = tk.Entry(frame, textvariable=box["name"], width=15)
+        coord_label = tk.Label(frame, text="[x:0 y:0 w:0 h:0]", anchor="w")
+        fuzzy_dropdown = ttk.Combobox(frame, values=FUZZY_OPTIONS, textvariable=box["fuzzy_type"], state="readonly", width=20)
 
-        frame.pack(fill="x", pady=3, padx=10, anchor="w")
+        frame.pack(fill="x", pady=2, padx=5, anchor="w")
         radio.pack(side="left")
         entry.insert(0, f"Attribute {idx+1}{name_hint}")
         entry.pack(side="left", padx=(5, 5))
         coord_label.pack(side="left")
+        fuzzy_dropdown.pack(side="left", padx=5)
 
-        box.update({"radio": radio, "entry": entry, "label": coord_label})
+        box.update({"radio": radio, "entry": entry, "label": coord_label, "dropdown": fuzzy_dropdown})
         self.capture_boxes.append(box)
         self.set_current_box(idx)
-        entry.focus_set()  # Set focus to new entry
 
     def set_current_box(self, index=None):
         if index is not None:
@@ -168,4 +165,7 @@ class RegionSelector:
         self.root.destroy()
 
     def get_capture_data(self):
-        return [(box["name"].get(), box["coords"]) for box in self.capture_boxes if box["coords"]]
+        return [
+            (box["name"].get(), box["coords"], box["fuzzy_type"].get())
+            for box in self.capture_boxes if box["coords"]
+        ]
