@@ -13,7 +13,7 @@ CardScanner is a free, open-source OCR tool for scanned Pokémon, Magic: The Gat
   - Median of recent listings  
   - Last sold non-outlier listing  
 - 💻 ~~**No Install Required** — Ships as a portable `.exe` (Windows only)~~
-  - Well you can't win them all... you gotta install Tessaract OCR yourself :(  
+  - Well you can't win them all... you gotta install Tessaract OCR yourself, it's easy though. Instructions are in the ReadMe :)  
 - 🧾 **MIT Licensed** — Free to use, hack, and share  
 
 ---
