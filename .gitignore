@@ -14,3 +14,7 @@ dist/*
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Local tooling
+.scrape_tool
+scrape_tool.py
