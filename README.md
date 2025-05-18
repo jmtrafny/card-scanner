@@ -13,6 +13,38 @@ This tool helps you quickly organize scanned trading cards (Magic, Pokémon, Yu-
 
 ---
 
+## ⚙️ Prerequisite: Install Tesseract OCR
+
+CardScanner uses [Tesseract OCR](https://github.com/tesseract-ocr/tesseract), which must be installed separately.
+
+### 🪿 Windows Installation
+
+1. Download the official installer from [GitHub Releases](https://github.com/UB-Mannheim/tesseract/wiki)
+   - Recommended: **tesseract-ocr-w64-setup.exe** from the [UB Mannheim build](https://github.com/UB-Mannheim/tesseract/wiki)
+
+2. Run the installer and **make sure you check the option** to:
+   > ✅ *Add Tesseract to the system PATH*
+
+3. After installation, open Command Prompt and test:
+   ```cmd
+   tesseract --version
+   ```
+
+   If it prints the version, you're good to go!
+
+### 🧪 If It's Not Detected...
+
+If Tesseract isn't working, you likely need to manually add it to your system PATH:
+
+1. Open **System Properties → Advanced → Environment Variables**
+2. Under **System variables**, find and edit the `Path` variable
+3. Add the path to your Tesseract installation, usually:
+   ```
+   C:\Program Files\Tesseract-OCR
+   ```
+4. Restart your computer or log out/log in again
+
+
 ## 🚀 How to Use It
 
 ### 1. **Start the App**
@@ -90,9 +122,9 @@ After scanning, your output folder will include:
 - You can rescan or retry OCR any time—just make a new folder and scan again
 - Always check the CSV file afterward to make sure it looks right!
 - You can zoom, pan, and scroll in the scan preview window:
-    - 👛 Scroll = vertical scroll
-    - ⇧ + Scroll = horizontal scroll
-    - ⌃ + Scroll = zoom in/out
+    - Scroll = vertical scroll
+    - Shift + Scroll = horizontal scroll
+    - Ctrl  + Scroll = zoom in/out
 
 ---
 
