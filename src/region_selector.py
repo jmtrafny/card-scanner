@@ -4,7 +4,7 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 from pathlib import Path
 
-FUZZY_OPTIONS = ["No Fuzzy Matching", "Pokemon Name"]
+FUZZY_OPTIONS = ["No Fuzzy Matching", "Pokemon Name", "YuGiOh Card Name", "MTG Card Name"]
 
 class RegionSelector:
     def __init__(self, image_paths):

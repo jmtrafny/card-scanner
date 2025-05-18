@@ -64,6 +64,7 @@ To add new fuzzy matching sources:
        "YuGiOh": "yugioh.txt",  # ← Add new entries like this
    }
    ```
+4. Add your new key value to the `FUZZY_OPTIONS` list in `region_selector.py`.
 
 This allows the dropdown in the region selector to dynamically associate your fuzzy match type with a specific card list.
 

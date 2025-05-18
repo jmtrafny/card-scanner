@@ -7,8 +7,8 @@ CARD_DB_DIR = Path(__file__).parent / "card_db"
 def load_card_list(tcgtag: str) -> list[str]:
     file_map = {
         "Pokemon Name": "pokemon_name.txt",
-        "YuGiOh": "yugioh.txt",
-        "MTG": "mtg.txt"
+        "YuGiOh Card Name": "yugioh_card_names.txt",
+        "MTG Card Name": "mtg_card_names.txt"
     }
     filename = file_map.get(tcgtag)
     if not filename:
